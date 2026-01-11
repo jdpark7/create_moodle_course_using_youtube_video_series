@@ -7,6 +7,15 @@ import json
 import re
 import subprocess
 import hashlib
+from xml.sax.saxutils import escape
+
+def escape_xml(text):
+    if text is None:
+        return ""
+    # Only escape if it's a string
+    if not isinstance(text, str):
+        text = str(text)
+    return escape(text, entities={"'": "&apos;", "\"": "&quot;"})
 
 # Templates for XML files (Refined to match sample exactly)
 MOODLE_BACKUP_XML_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
@@ -300,8 +309,8 @@ def extract_playlist_info(url, start_index=None, end_index=None):
 
 class MoodleCourseCreator:
     def __init__(self, course_name, videos):
-        self.course_fullname = course_name
-        self.course_shortname = course_name[:10]
+        self.course_fullname = escape_xml(course_name)
+        self.course_shortname = escape_xml(course_name[:10])
         self.videos = videos
         self.backup_date = int(time.time())
         self.backup_id = hashlib.md5(str(self.backup_date).encode()).hexdigest()
@@ -340,8 +349,11 @@ class MoodleCourseCreator:
             act_dir = os.path.join(self.output_dir, "activities", f"videowatch_{module_id}")
             os.makedirs(act_dir)
             
+            video_title_escaped = escape_xml(video['title'])
+            video_url_escaped = escape_xml(video['url'])
+
             self.write_xml(os.path.join(act_dir, "videowatch.xml"),
-                           VIDEOWATCH_XML_TEMPLATE.format(instanceid=instance_id, moduleid=module_id, contextid=context_id, name=video['title'], url=video['url'], timemodified=self.backup_date))
+                           VIDEOWATCH_XML_TEMPLATE.format(instanceid=instance_id, moduleid=module_id, contextid=context_id, name=video_title_escaped, url=video_url_escaped, timemodified=self.backup_date))
             
             self.write_xml(os.path.join(act_dir, "module.xml"),
                            MODULE_XML_TEMPLATE.format(moduleid=module_id, sectionid=section_id, sectionnumber=num, timemodified=self.backup_date))
@@ -353,11 +365,11 @@ class MoodleCourseCreator:
             sec_dir = os.path.join(self.output_dir, "sections", f"section_{section_id}")
             os.makedirs(sec_dir, exist_ok=True)
             self.write_xml(os.path.join(sec_dir, "section.xml"),
-                           SECTION_XML_TEMPLATE.format(sectionid=section_id, number=num, name=f"{num}. {video['title']}", sequence=module_id, timemodified=self.backup_date))
+                           SECTION_XML_TEMPLATE.format(sectionid=section_id, number=num, name=f"{num}. {video_title_escaped}", sequence=module_id, timemodified=self.backup_date))
             self.write_xml(os.path.join(sec_dir, "inforef.xml"), '<?xml version="1.0" encoding="UTF-8"?><inforef></inforef>')
 
-            activities_xml.append(ACTIVITY_ENTRY_TEMPLATE.format(moduleid=module_id, sectionid=section_id, modulename="videowatch", title=video['title']))
-            sections_xml.append(SECTION_ENTRY_TEMPLATE.format(sectionid=section_id, title=f"{num}. {video['title']}"))
+            activities_xml.append(ACTIVITY_ENTRY_TEMPLATE.format(moduleid=module_id, sectionid=section_id, modulename="videowatch", title=video_title_escaped))
+            sections_xml.append(SECTION_ENTRY_TEMPLATE.format(sectionid=section_id, title=f"{num}. {video_title_escaped}"))
             settings_xml.append(SETTING_ACTIVITY_TEMPLATE.format(modulename="videowatch", moduleid=module_id))
             settings_xml.append(SETTING_SECTION_TEMPLATE.format(sectionid=section_id))
 
